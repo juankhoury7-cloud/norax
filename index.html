@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0B1220">
 <link rel="manifest" href="manifest.webmanifest">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -214,6 +215,7 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
     <div><b>Norax</b><small>Tu guía en CEDEARs · Bull Market</small></div></div>
   <span id="status" class="pill"><span class="dot"></span><span id="statusTxt">Listo</span></span>
   <button id="btnUpd" class="pri">Actualizar</button>
+  <button id="btnUser" class="small">Entrar</button>
   <button id="btnCfg">Ajustes</button>
 </div></header>
 
@@ -284,6 +286,18 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
 </main>
 
 <div class="ov" id="ovDetail" role="dialog" aria-modal="true"><div class="sheet" id="detail"></div></div>
+<div class="ov" id="ovLogin" role="dialog" aria-modal="true" aria-labelledby="lgT"><div class="sheet" style="width:min(440px,100%);margin-top:6vh">
+  <div style="display:flex;align-items:center;gap:10px"><div class="logo" id="lgLogo"></div><h3 id="lgT" style="margin:0">Entrá a Norax</h3></div>
+  <p class="hint" id="lgSub">Con tu cuenta, tu cartera y tus ajustes quedan guardados y los ves igual en el celu y en cualquier compu.</p>
+  <form id="lgForm">
+    <label style="margin-top:14px">Email<input id="lgEmail" type="email" autocomplete="email" required></label>
+    <label style="margin-top:12px">Contraseña<input id="lgPass" type="password" autocomplete="current-password" minlength="6" required></label>
+    <div class="row"><button class="pri" type="submit" id="lgGo" style="flex:1">Entrar</button></div>
+  </form>
+  <p class="hint" style="text-align:center;margin-top:12px"><a href="#" id="lgSwitch">¿No tenés cuenta? Creala acá</a></p>
+  <p class="warn" id="lgMsg" style="text-align:center"></p>
+  <p class="hint" style="text-align:center;margin-top:16px"><a href="#" id="lgSkip">Seguir sin cuenta (solo en este dispositivo)</a></p>
+</div></div>
 <div class="ov" id="ovBuy" role="dialog" aria-modal="true"><div class="sheet" id="buy"></div></div>
 <div class="ov" id="ovCfg" role="dialog" aria-modal="true"><div class="sheet">
   <button class="x small" data-close="ovCfg">Cerrar</button>
@@ -306,7 +320,24 @@ const NAMES={SPY:'S&P 500 (ETF)',QQQ:'Nasdaq 100 (ETF)',AAPL:'Apple',MSFT:'Micro
 const DEF={key:'',syms:['SPY','QQQ','AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','AVGO','AMD','NFLX','MELI','KO','WMT','JPM','V','DIS','NKE','BABA','PBR','VIST','GLOB','XOM','INTC','UBER','COST','BRK.B','PLTR','GLD'],minScore:70,broker:'Bull Market Brokers',brokerUrl:'https://www.bullmarketbrokers.com',feePct:0.65,ratios:{AAPL:20,MSFT:30,GOOGL:58,AMZN:144,TSLA:15,NVDA:24,META:24,KO:5,MELI:120,SPY:60}};
 let S={settings:{...DEF,ratios:{...DEF.ratios}},data:{},updatedAt:0,ccl:null,holdings:[],history:[]};
 try{const o=JSON.parse(localStorage.getItem(KEY)||'null');if(o)S={...S,...o,settings:{...DEF,...(o.settings||{}),ratios:{...DEF.ratios,...((o.settings||{}).ratios||{})}}}}catch(e){}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){showAlert('El navegador no pudo guardar los datos (memoria llena).')}};
+const SYNC_KEYS=['settings','holdings','history','feed','lastSt'];
+let sb=null,user=null,pushT=null,lastPush=0,syncing=false;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){showAlert('El navegador no pudo guardar los datos (memoria llena).')}
+  if(user&&!syncing){clearTimeout(pushT);pushT=setTimeout(push,1500)}};
+async function push(){if(!sb||!user)return;const data={};SYNC_KEYS.forEach(k=>data[k]=S[k]);const t=new Date().toISOString();
+  const {error}=await sb.from('norax_state').upsert({user_id:user.id,data,updated_at:t});if(!error){lastPush=Date.parse(t);S.syncAt=lastPush;localStorage.setItem(KEY,JSON.stringify(S));setUser()}}
+async function pull(first){if(!sb||!user)return;
+  const {data,error}=await sb.from('norax_state').select('data,updated_at').eq('user_id',user.id).maybeSingle();
+  if(error){feed('No pude sincronizar: '+error.message,'dn');return}
+  if(!data){await push();return}
+  const ts=Date.parse(data.updated_at);if(!first&&ts<=lastPush)return;
+  syncing=true;const d=data.data||{};
+  let merged=false;if(first&&!(d.holdings&&d.holdings.length)&&S.holdings.length){d.holdings=S.holdings;merged=true}
+  SYNC_KEYS.forEach(k=>{if(d[k]!==undefined)S[k]=d[k]});
+  S.settings={...DEF,...S.settings,ratios:{...DEF.ratios,...(S.settings.ratios||{})}};
+  lastPush=ts;save();syncing=false;analyzeAll();render();
+  if(merged)push();
+}
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd=x=>isFinite(x)?'US$ '+x.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'–';
@@ -748,6 +779,36 @@ new ResizeObserver(()=>{for(const r of Object.values(R))if(r&&r.sym)spark($('sp-
 new ResizeObserver(()=>renderPat(S.holdings.map(h=>({h,s:holdingState(h)})))).observe($('patSvg'));
 
 analyzeAll();render();
+/* ---------- cuenta ---------- */
+const SB_URL='https://uuhojcymrqnkhemuguvc.supabase.co',SB_KEY='sb_publishable_c7EAIgXVlqdUWz3NWZt1LA_AZPuHrM_';
+let signup=false;
+function setUser(){const b=$('btnUser');if(!b)return;b.textContent=user?'● '+(user.email||'').split('@')[0]:'Entrar';b.title=user?'Sincronizado'+(S.syncAt?' · '+new Date(S.syncAt).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false}):''):'Entrá para guardar tus datos en la nube'}
+function showLogin(){if(!sb){showAlert('No pude cargar el sistema de cuentas. Revisá tu conexión.');return}
+  $('lgLogo').innerHTML=$('logo').innerHTML;$('lgMsg').textContent='';$('ovLogin').classList.add('show');setTimeout(()=>$('lgEmail').focus(),50)}
+$('lgSwitch').onclick=e=>{e.preventDefault();signup=!signup;$('lgT').textContent=signup?'Creá tu cuenta':'Entrá a Norax';$('lgGo').textContent=signup?'Crear cuenta':'Entrar';
+  $('lgPass').autocomplete=signup?'new-password':'current-password';$('lgSwitch').textContent=signup?'¿Ya tenés cuenta? Entrá acá':'¿No tenés cuenta? Creala acá';$('lgMsg').textContent=''};
+$('lgSkip').onclick=e=>{e.preventDefault();S.skipLogin=true;localStorage.setItem(KEY,JSON.stringify(S));$('ovLogin').classList.remove('show')};
+$('lgForm').onsubmit=async e=>{e.preventDefault();const email=$('lgEmail').value.trim(),password=$('lgPass').value;$('lgGo').disabled=true;$('lgMsg').textContent='';
+  try{
+    if(signup){const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}});if(error)throw error;
+      if(!data.session){$('lgMsg').textContent='Listo. Te mandamos un email para confirmar la cuenta: abrilo, tocá el link y después entrá acá.';signup=true;$('lgSwitch').click();return}}
+    else{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error}
+    $('ovLogin').classList.remove('show');$('lgPass').value='';
+  }catch(err){$('lgMsg').textContent=/Invalid login/i.test(err.message)?'Email o contraseña incorrectos.':/not confirmed/i.test(err.message)?'Todavía no confirmaste tu email. Revisá tu casilla (y spam).':/already registered/i.test(err.message)?'Ese email ya tiene cuenta: entrá con tu contraseña.':'No se pudo: '+err.message}
+  finally{$('lgGo').disabled=false}};
+$('btnUser').onclick=async()=>{if(!user){showLogin();return}
+  const b=$('btnUser');if(!b.dataset.sure){b.dataset.sure=1;b.textContent='¿Cerrar sesión? tocá otra vez';setTimeout(()=>{delete b.dataset.sure;setUser()},4000);return}
+  delete b.dataset.sure;await sb.auth.signOut()};
+try{if(window.supabase&&!SB_URL.startsWith('__'))sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}catch(e){sb=null}
+if(sb){
+  sb.auth.onAuthStateChange(async(ev,session)=>{const was=user;user=session?.user||null;setUser();
+    if(user&&(!was||was.id!==user.id)){feed(`Sesión iniciada como ${user.email}. Tus datos se sincronizan.`,'up');await pull(true)}
+    if(!user&&was){feed('Cerraste sesión. Los datos quedan solo en este dispositivo.')}});
+  sb.auth.getSession().then(({data})=>{if(!data.session&&!S.skipLogin)showLogin()});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pull(false)});
+  setInterval(()=>pull(false),120e3);
+}
+setUser();
 setInterval(tick,1000);setTimeout(tick,800);
 if(window.VIGIA_WAIT)window.__v={live:livePrices,feed};
 }
