@@ -147,6 +147,20 @@ input,select{display:block;width:100%;margin-top:6px;font:inherit;font-size:16px
 .fld{margin-top:18px}
 .sum{margin-top:18px;padding:14px 16px;border:1px solid var(--line2);border-radius:14px;background:rgba(123,92,255,.08);font-size:14px}
 .warn{color:var(--warn);font-size:12.5px;margin-top:4px}
+.plIn label{display:flex;flex-direction:column;gap:6px}.plIn .seg{align-self:flex-start;margin-top:0}.plIn .amt{margin-top:0}
+.plIn{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,.6fr);gap:18px;align-items:start;margin-top:14px}
+@media(max-width:900px){.plIn{grid-template-columns:minmax(0,1fr)}}
+.amt{display:flex;align-items:center;gap:10px;margin-top:6px;border:1px solid var(--line2);border-radius:14px;padding:4px 14px;background:rgba(11,18,32,.6)}
+.amt span{color:var(--mut);font-weight:600}.amt input{border:0;background:none;margin:0;padding:8px 0;font-size:26px;font-weight:700;letter-spacing:-.01em}
+.amt input:focus-visible{outline:none}.amt:focus-within{outline:2px solid var(--lav);outline-offset:2px}
+.plSum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0 12px}
+@media(max-width:700px){.plSum{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.plSum div{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.03)}
+.plSum small{display:block;font-size:12px;color:var(--mut)}.plSum b{font-size:19px;font-weight:700}
+.plRow{display:grid;grid-template-columns:auto minmax(0,1.3fr) repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line);font-size:14px}
+.plRow .n{text-align:right}.plRow small{display:block;color:var(--mut);font-size:12px}
+@media(max-width:760px){.plRow{grid-template-columns:auto minmax(0,1fr) auto}.plRow .x{display:none}}
+.cmp{margin-top:12px;font-size:13px;color:var(--mut)}
 /* mesa animada */
 .hubHead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .hubHead h2{margin:0}
@@ -253,6 +267,17 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
     <div class="feed" id="feed"></div>
   </section>
 
+  <section class="card" id="planner">
+    <div class="hubHead"><h2>¿Cuánto querés invertir?</h2><span class="hint" style="margin:0">Norax arma un plan con las propuestas de hoy, tu broker y sus comisiones.</span></div>
+    <div class="plIn">
+      <label>Monto en pesos<div class="amt"><span>ARS</span><input id="plAmt" type="text" inputmode="numeric" placeholder="500.000" autocomplete="off"></div>
+        <div class="seg" id="plQuick"></div></label>
+      <label>Broker<div class="seg" id="plBrk"></div><span class="hint" id="plBrkInfo"></span></label>
+      <div style="padding-top:25px"><button class="pri" id="plGo" style="width:100%;min-height:52px;font-size:16px">Armar mi plan</button></div>
+    </div>
+    <div id="plOut"></div>
+  </section>
+
   <section>
     <h2><span>Mejores propuestas de hoy</span><span id="picksNote"></span></h2>
     <div class="picks" id="picks"><div class="card empty">Todavía no hay datos. Tocá <b>Actualizar</b>.</div></div>
@@ -317,7 +342,11 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
 {
 const KEY='vigia.cedears.v1';
 const NAMES={SPY:'S&P 500 (ETF)',QQQ:'Nasdaq 100 (ETF)',AAPL:'Apple',MSFT:'Microsoft',NVDA:'Nvidia',GOOGL:'Alphabet (Google)',AMZN:'Amazon',META:'Meta',TSLA:'Tesla',AVGO:'Broadcom',AMD:'AMD',NFLX:'Netflix',MELI:'Mercado Libre',KO:'Coca-Cola',WMT:'Walmart',JPM:'JPMorgan',V:'Visa',DIS:'Disney',NKE:'Nike',BABA:'Alibaba',PBR:'Petrobras',VIST:'Vista Energy',GLOB:'Globant',XOM:'Exxon Mobil',INTC:'Intel',UBER:'Uber',COST:'Costco','BRK.B':'Berkshire Hathaway',PLTR:'Palantir',GLD:'Oro (ETF)',MA:'Mastercard',PEP:'PepsiCo',CVX:'Chevron',QCOM:'Qualcomm',ADBE:'Adobe',CRM:'Salesforce',ORCL:'Oracle',PFE:'Pfizer',JNJ:'Johnson & Johnson',MCD:'McDonald\'s',SBUX:'Starbucks',SHOP:'Shopify',SPOT:'Spotify',COIN:'Coinbase',MSTR:'Strategy',YPF:'YPF',GGAL:'Grupo Galicia',BBVA:'BBVA',T:'AT&T',BA:'Boeing'};
-const DEF={key:'',syms:['SPY','QQQ','AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','AVGO','AMD','NFLX','MELI','KO','WMT','JPM','V','DIS','NKE','BABA','PBR','VIST','GLOB','XOM','INTC','UBER','COST','BRK.B','PLTR','GLD'],minScore:70,broker:'Bull Market Brokers',brokerUrl:'https://www.bullmarketbrokers.com',feePct:0.65,ratios:{AAPL:20,MSFT:30,GOOGL:58,AMZN:144,TSLA:15,NVDA:24,META:24,KO:5,MELI:120,SPY:60}};
+const BROKERS={'Bull Market Brokers':{short:'Bull Market',fee:0.65,min:0,url:'https://www.bullmarketbrokers.com'},
+  'IOL':{short:'IOL',fee:0.67,min:250,url:'https://www.invertironline.com'},
+  'Cocos Capital':{short:'Cocos',fee:0.6,min:0,url:'https://cocos.capital'},
+  'Balanz':{short:'Balanz',fee:0.67,min:250,url:'https://balanz.com'}};
+const DEF={key:'',syms:['SPY','QQQ','AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','AVGO','AMD','NFLX','MELI','KO','WMT','JPM','V','DIS','NKE','BABA','PBR','VIST','GLOB','XOM','INTC','UBER','COST','BRK.B','PLTR','GLD'],minScore:70,broker:'Bull Market Brokers',brokerUrl:'https://www.bullmarketbrokers.com',feePct:0.65,minFee:0,planAmt:0,ratios:{AAPL:20,MSFT:30,GOOGL:58,AMZN:144,TSLA:15,NVDA:24,META:24,KO:5,MELI:120,SPY:60}};
 let S={settings:{...DEF,ratios:{...DEF.ratios}},data:{},updatedAt:0,ccl:null,holdings:[],history:[]};
 try{const o=JSON.parse(localStorage.getItem(KEY)||'null');if(o)S={...S,...o,settings:{...DEF,...(o.settings||{}),ratios:{...DEF.ratios,...((o.settings||{}).ratios||{})}}}}catch(e){}
 const SYNC_KEYS=['settings','holdings','history','feed','lastSt'];
@@ -335,7 +364,7 @@ async function pull(first){if(!sb||!user)return;
   let merged=false;if(first&&!(d.holdings&&d.holdings.length)&&S.holdings.length){d.holdings=S.holdings;merged=true}
   SYNC_KEYS.forEach(k=>{if(d[k]!==undefined)S[k]=d[k]});
   S.settings={...DEF,...S.settings,ratios:{...DEF.ratios,...(S.settings.ratios||{})}};
-  lastPush=ts;save();syncing=false;analyzeAll();render();
+  lastPush=ts;save();syncing=false;analyzeAll();render();drawPlannerInputs();
   if(merged)push();
 }
 const $=id=>document.getElementById(id);
@@ -707,13 +736,76 @@ $('cSave').onclick=()=>{const st=S.settings,old=new Set(st.syms);st.key=$('cKey'
   st.syms=[...new Set($('cSyms').value.split(/[,\s]+/).map(x=>x.trim().toUpperCase()).filter(Boolean))];
   st.broker=$('cBroker').value.trim()||'Bull Market Brokers';const nr={};$('cRatios').value.split(',').forEach(p=>{const[a,b]=p.split('=').map(x=>x&&x.trim());const v=parseFloat((b||'').replace(',','.'));if(a&&v>0)nr[a.toUpperCase()]=v});st.ratios=nr;const fp=parseFloat($('cFee').value);if(isFinite(fp)&&fp>=0)st.feePct=fp;
   const m=parseFloat($('cMin').value);if(isFinite(m))st.minScore=Math.min(95,Math.max(50,m));
-  save();$('ovCfg').classList.remove('show');analyzeAll();render();
+  save();$('ovCfg').classList.remove('show');analyzeAll();render();drawPlannerInputs();
   const nw=st.syms.filter(s=>!old.has(s)&&!S.data[s]);if(nw.length&&st.key)update(nw)};
 $('cReset').onclick=()=>{const b=$('cReset');if(b.dataset.sure){S.history=[];save();render();b.textContent='Historial borrado';delete b.dataset.sure;return}
   b.dataset.sure=1;b.textContent='Tocá otra vez para confirmar';setTimeout(()=>{delete b.dataset.sure;b.textContent='Borrar historial de propuestas'},4000)};
 /* ---------- registrar compra ---------- */
 let B={};
 const today=(o=0)=>{const d=new Date(Date.now()-o*864e5);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+/* ---------- planificador ---------- */
+const parseAmt=v=>+String(v).replace(/[^\d]/g,'')||0;
+const fmtAmt=n=>n?n.toLocaleString('es-AR'):'';
+function drawPlannerInputs(){
+  const st=S.settings;$('plAmt').value=fmtAmt(st.planAmt);
+  $('plQuick').innerHTML=[100000,250000,500000,1000000].map(v=>`<button class="small" data-amt="${v}">${v>=1e6?(v/1e6)+' M':(v/1e3)+' mil'}</button>`).join('');
+  $('plBrk').innerHTML=Object.entries(BROKERS).map(([k,b])=>`<button class="small${st.broker===k?' sel':''}" data-brk="${esc(k)}">${esc(b.short)}</button>`).join('');
+  $('plBrkInfo').textContent=`Costo estimado por compra o venta: ${String(st.feePct).replace('.',',')}% (comisión + IVA + derechos de mercado)${st.minFee?`, mínimo ARS ${st.minFee}`:''}. Ajustable en Ajustes.`;
+}
+function setBroker(k){const b=BROKERS[k];if(!b)return;Object.assign(S.settings,{broker:k,brokerUrl:b.url,feePct:b.fee,minFee:b.min});save();drawPlannerInputs();render();if($('plOut').innerHTML)plan()}
+function costOf(amount,fp,minF){return Math.max(amount*fp/100,amount>0?minF:0)}
+function buildPlan(amount,fp,minF){
+  const cands=S.settings.syms.map(x=>R[x]).filter(r=>r&&!r.error&&r.state==='buy'&&isFinite(toArs(r.sym,r.px))).sort((a,b)=>b.score-a.score);
+  if(!cands.length)return{lines:[],reason:'none'};
+  const minPos=Math.max(minF?minF/(fp/100):0,40000);
+  let pool=cands.slice(),lines=[],left=0,cap=.5;
+  for(let guard=0;guard<6;guard++){
+    const n=Math.max(1,Math.min(pool.length,5,Math.floor(amount/minPos)));
+    cap=n<=2?.5:Math.max(.35,1/n+.1);   /* nunca más de la mitad en una sola acción */
+    const pick=pool.slice(0,n),w=pick.map(r=>1/((r.px-r.stop)/r.px)),ws=w.reduce((a,b)=>a+b,0);
+    lines=pick.map((r,i)=>({r,price:toArs(r.sym,r.px),alloc:amount*Math.min(cap,w[i]/ws)}));
+    lines.forEach(l=>{l.qty=Math.floor(l.alloc/(l.price*(1+fp/100)))});
+    const zero=lines.filter(l=>!l.qty).map(l=>l.r.sym);
+    if(!zero.length||pool.length<=1)break;
+    pool=pool.filter(r=>!zero.includes(r.sym));
+  }
+  left=amount-lines.reduce((a,l)=>a+l.qty*l.price+costOf(l.qty*l.price,fp,minF),0);
+  for(const l of lines.slice().sort((a,b)=>b.r.score-a.r.score)){while(l.qty&&l.price*(1+fp/100)<=left&&(l.qty+1)*l.price<=amount*cap){l.qty++;left-=l.price*(1+fp/100)}}
+  lines=lines.filter(l=>l.qty>0);
+  lines.forEach(l=>{const tot=l.qty*l.price,c=costOf(tot,fp,minF),stopA=toArs(l.r.sym,l.r.stop),tgtA=toArs(l.r.sym,l.r.target);
+    Object.assign(l,{tot,fee:c,loss:l.qty*(l.price-stopA)+c+costOf(l.qty*stopA,fp,minF),gain:l.qty*(tgtA-l.price)-c-costOf(l.qty*tgtA,fp,minF),stopA,tgtA})});
+  const inv=lines.reduce((a,l)=>a+l.tot,0),fees=lines.reduce((a,l)=>a+l.fee,0);
+  return{lines,cap,inv,fees,cash:amount-inv-fees,loss:lines.reduce((a,l)=>a+l.loss,0),gain:lines.reduce((a,l)=>a+l.gain,0),cands:cands.length};
+}
+function plan(){
+  const amount=parseAmt($('plAmt').value),st=S.settings;S.settings.planAmt=amount;save();
+  if(!amount){$('plOut').innerHTML='<p class="empty">Poné cuánto querés invertir.</p>';return}
+  if(!Object.keys(R).length){$('plOut').innerHTML='<p class="empty">Primero tocá <b>Actualizar</b> para tener los precios de hoy.</p>';return}
+  const P=buildPlan(amount,st.feePct,st.minFee||0);
+  if(P.reason==='none'||!P.lines.length){
+    const noRatio=S.settings.syms.filter(x=>R[x]&&R[x].state==='buy'&&!isFinite(toArs(x,R[x].px)));
+    $('plOut').innerHTML=`<p class="empty">${P.reason==='none'?'Hoy Norax no ve ninguna propuesta de compra que cumpla sus reglas. No comprar también es una decisión: conviene esperar a la próxima señal.':'Con ese monto no alcanza para comprar ni un CEDEAR de las propuestas de hoy. Probá con un monto mayor.'}${noRatio.length?` Hay propuestas que todavía no puedo pasar a pesos (${esc(noRatio.join(', '))}): cargá su ratio en Ajustes.`:''}</p>`;return}
+  const others=Object.entries(BROKERS).filter(([k])=>k!==st.broker).map(([k,b])=>({k,b,c:buildPlan(amount,b.fee,b.min).fees}));
+  const best=others.sort((a,b)=>a.c-b.c)[0];
+  $('plOut').innerHTML=`<div class="plSum"><div><small>Invertís</small><b>${esc(ars(P.inv))}</b></div><div><small>Comisiones de compra</small><b>${esc(ars(P.fees))}</b></div>
+    <div><small>Si todo toca el stop</small><b class="dn">−${esc(ars(P.loss).replace('ARS ','ARS '))}</b></div><div><small>Si todo llega al objetivo</small><b class="up">+${esc(ars(P.gain))}</b></div></div>
+    <p class="hint" style="margin:0 0 6px">${P.lines.length>1?`Repartido en ${P.lines.length} CEDEARs, con más plata en los de stop más cercano para que cada uno arriesgue parecido.`:'Todo en un solo CEDEAR.'} Te quedan ${esc(ars(P.cash))} sin invertir${P.lines.length<=2&&P.cash>amount*.3?': con pocas oportunidades hoy, Norax no pone más de la mitad en una sola acción. Podés guardarlos para las próximas propuestas':''}.${P.cands>P.lines.length?` Hay ${P.cands} propuestas: las que no entran es porque un CEDEAR cuesta más de lo que conviene poner en una sola acción con este monto, o porque dividir más haría que las comisiones se coman la ganancia.`:''}</p>
+    ${P.lines.map(l=>`<div class="plRow">${av(l.r.sym)}<div><b>${esc(l.r.sym)}</b> · ${l.qty} CEDEAR${l.qty>1?'s':''}<small>a ≈ ${esc(ars(l.price))} c/u · puntaje ${l.r.score}</small></div>
+      <div class="n"><b>${esc(ars(l.tot))}</b><small>+ ${esc(ars(l.fee))} comisión</small></div>
+      <div class="n x"><span class="dn">${esc(ars(l.stopA))}</span><small>salir si baja de</small></div>
+      <div class="n x"><span class="up">${esc(ars(l.tgtA))}</span><small>objetivo</small></div>
+      <button class="small" data-buyplan="${esc(l.r.sym)}" data-q="${l.qty}">Ya lo compré</button></div>`).join('')}
+    <p class="cmp">${best&&best.c<P.fees-1?`Con ${esc(best.b.short)} este mismo plan pagaría ≈ ${esc(ars(P.fees-best.c))} menos de comisión de compra.`:`Para este monto, ${esc(BROKERS[st.broker]?.short||st.broker)} está entre los más baratos de los que comparo.`} Las comisiones son estimadas: confirmalas en el tarifario de tu broker. Los precios en pesos son aproximados; antes de comprar mirá el precio real en tu broker y usá orden límite.</p>
+    <p class="cmp">Es un plan armado con las reglas de Norax, no un asesoramiento financiero. Invertí solo plata que no necesites en el corto plazo.</p>`;
+}
+$('plGo').onclick=plan;
+$('plAmt').addEventListener('input',e=>{const n=parseAmt(e.target.value);e.target.value=fmtAmt(n)});
+$('plAmt').addEventListener('keydown',e=>{if(e.key==='Enter')plan()});
+$('planner').addEventListener('click',e=>{
+  const a=e.target.closest('[data-amt]');if(a){$('plAmt').value=fmtAmt(+a.dataset.amt);plan();return}
+  const b=e.target.closest('[data-brk]');if(b){setBroker(b.dataset.brk);return}
+  const bp=e.target.closest('[data-buyplan]');if(bp){openBuy(bp.dataset.buyplan);B.qty=+bp.dataset.q||1;drawBuy();return}
+});
 function openBuy(sym){B={sym:sym||'',date:today(),dateMode:'hoy',qty:1,price:null,q:''};if(sym)B.price=estArs(sym);drawBuy();$('ovBuy').classList.add('show')}
 const estArs=sym=>{const r=R[sym];const v=r&&!r.error?toArs(sym,r.px):NaN;return isFinite(v)?Math.round(v*100)/100:null};
 function drawBuy(){
@@ -808,7 +900,7 @@ if(sb){
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pull(false)});
   setInterval(()=>pull(false),120e3);
 }
-setUser();
+setUser();drawPlannerInputs();
 setInterval(tick,1000);setTimeout(tick,800);
 if(window.VIGIA_WAIT)window.__v={live:livePrices,feed};
 }
